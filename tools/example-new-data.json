@@ -1,0 +1,17 @@
+{
+  "patterns": [
+    { "name": "예: would have p.p.", "rule": "\"~했을 텐데\" — 과거 가정", "ex": "I would have gone", "week": "Week4", "cat": "시제" }
+  ],
+  "phrases": [
+    { "en": "for what it's worth", "ko": "참고로 말하자면", "day": 21, "week": "Week4" }
+  ],
+  "sentences": [
+    { "en": "Example sentence here.", "ko": "예시 문장.", "day": 21, "theme": "Theme Name", "week": "Week4" }
+  ],
+  "narratives": [
+    { "title": "Day 21 — Example", "day": 21, "ko": "한국어 원문…", "en_lines": ["First sentence.", "Second sentence."], "week": "Week4" }
+  ],
+  "recall": [
+    { "ko": "한국어 프롬프트", "en": "English answer.", "week": "Week4", "topic": "빈도/시간", "group": "회화·소통" }
+  ]
+}

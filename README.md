@@ -15,6 +15,21 @@
 
 Vercel 정적 배포(제로 설정). 루트의 `index.html`이 `/`로, `api/sync.mjs`가 `/api/sync`로 서빙됨.
 
+## 새 학습분 추가 (Day 21+)
+
+내장 DB(136KB 한 줄)를 손으로 고치지 말고 스크립트를 쓸 것:
+
+```bash
+node tools/add-data.mjs new-data.json --dry-run   # 검증만
+node tools/add-data.mjs new-data.json             # 실제 추가 (index.html.bak 백업 자동 생성)
+```
+
+- 입력 형식은 `tools/example-new-data.json` 참고. 필요한 컬렉션만 넣으면 됨.
+- 필수 필드·타입·중복(기존+신규)·오타 필드를 검증하고, 문제 있으면 아무것도 안 바꿈.
+- patterns `id`(P125…)와 recall `id`(r+해시)는 자동 부여. phrases `star`는 false 기본.
+- 헤더의 개수(패턴 N · 표현 N …)와 Day 범위도 자동 갱신.
+- 새 week/group/cat 값은 허용하되 경고로 알려줌(오타 방지).
+
 ## 동기화 동작
 
 부팅 시 cloudPull, 즐겨찾기 토글 시 디바운스 cloudPush. 네트워크 실패 시 localStorage로 정상 동작.

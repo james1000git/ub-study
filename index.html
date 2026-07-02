@@ -136,6 +136,20 @@
   .fc-t.current{border-color:var(--accent);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);}
   .fc-t.current.on{color:#fff;}
 
+  /* 자기평가(맞음/틀림) + 발음(TTS) + 오답 덱 */
+  .fc-grade{display:flex;gap:9px;width:100%;max-width:430px;margin-bottom:10px;}
+  .fc-grade.hide{display:none;}
+  .fc-grade button{flex:1;padding:13px;border-radius:8px;font-size:14.5px;font-weight:800;
+    font-family:inherit;cursor:pointer;background:var(--card);}
+  .fc-grade .wrong{border:1.5px solid var(--accent);color:var(--accent);}
+  .fc-grade .right{border:1.5px solid var(--green);color:var(--green);}
+  .fc-grade .wrong:active{background:var(--accent);color:#fff;}
+  .fc-grade .right:active{background:var(--green);color:#fff;}
+  .card .tts{position:absolute;bottom:4px;left:10px;font-size:20px;line-height:1;
+    cursor:pointer;z-index:5;user-select:none;}
+  .card .tts:active{transform:scale(1.2);}
+  .fc-g.wrongdeck.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+
   footer{text-align:center;font-size:10px;color:var(--muted);padding:20px 16px 30px;
     border-top:1px solid var(--line);margin-top:22px;}
   .empty{text-align:center;color:var(--muted);font-size:13px;padding:30px 0;}
@@ -152,7 +166,7 @@
     /* 플래시카드 큼직하게 */
     .card{max-width:640px;min-height:300px;padding:40px 28px;}
     .card .q{font-size:23px;} .card .a{font-size:22px;}
-    .fc-nav{max-width:640px;}
+    .fc-nav,.fc-grade{max-width:640px;}
   }
   @media (min-width:1180px){
     /* 더 넓으면 표현·패턴·문장은 3열 */
@@ -165,7 +179,7 @@
   <div class="kicker">UB · English · Full Database</div>
   <h1>The <span class="red">Whole</span> Library</h1>
   <div class="sub">Day 1–20 전체 · 패턴 115 · 표현 260 · 문장 181 · 서사 15 · Recall 205</div>
-  <div class="stamp">v2.0</div>
+  <div class="stamp">v2.1</div>
 </header>
 
 <nav id="nav">
@@ -210,22 +224,28 @@
   </section>
 
   <section class="panel" id="drill">
-    <p class="lead">한국어 보고 영어 맞히기. 5초 룰. 카드 탭=정답. 필터로 범위 좁히기.</p>
+    <p class="lead">한국어 보고 영어 맞히기 · 탭=정답 → ✓맞음/✗틀림 누르면 오답 덱에 쌓임 · 카드 스와이프=이동 · PC: Space=뒤집기, ←→=이동, 1=틀림, 2=맞음</p>
     <div class="fc-wrap">
       <div class="fc-groups" id="fc-groups"></div>
       <div id="syncstatus" style="font-size:11px;text-align:center;margin:2px 0 4px;min-height:14px;color:#999;"></div>
       <div class="fc-topics hide" id="fc-topics"></div>
       <div style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:0;">
         <button class="fc-dir" id="fc-dir" onclick="toggleDir()">🔄 한국어 먼저</button>
+        <button class="fc-dir" id="fc-tts" onclick="toggleTts()">🔊 발음 켬</button>
         <button class="fc-weektoggle" id="fc-weektoggle" onclick="toggleWeekBox()">⚙︎ Week 필터 · 셔플</button>
       </div>
       <div class="fc-weekbox hide" id="fc-tools"></div>
       <div class="card" id="card" onclick="flip()">
         <div class="bm" id="cardbm" onclick="event.stopPropagation();toggleBm()">☆</div>
+        <div class="tts" id="cardtts" onclick="event.stopPropagation();speakCard()">🔊</div>
         <div class="side" id="cardside">KOREAN</div>
         <div class="q" id="cardtext">로딩…</div>
         <div class="hint" id="cardhint">탭해서 정답</div>
         <div class="origin" id="cardorigin"></div>
+      </div>
+      <div class="fc-grade hide" id="fc-grade">
+        <button class="wrong" onclick="gradeCard(false)">✗ 틀림</button>
+        <button class="right" onclick="gradeCard(true)">✓ 맞음</button>
       </div>
       <div class="fc-nav">
         <button class="ghost" onclick="prevCard()">← 이전</button>
@@ -377,6 +397,61 @@ function updateBmBtn(){
   btn.classList.toggle('on',on);
 }
 
+/* ---------- 오답 덱: 정답 확인 후 ✗틀림 누른 카드 id — localStorage + 클라우드 동기화 ---------- */
+const WRONG_KEY='ub_eng_wrongs';
+let wrongs=new Set();
+try{
+  const savedW=localStorage.getItem(WRONG_KEY);
+  if(savedW) wrongs=new Set(JSON.parse(savedW));
+}catch(e){}
+function saveWrongs(){
+  try{ localStorage.setItem(WRONG_KEY,JSON.stringify([...wrongs])); }catch(e){}
+  cloudPush();
+}
+function gradeCard(correct){
+  if(!fcDeck.length||!fcFlipped)return;  /* 정답을 본 뒤에만 평가 가능 */
+  const id=fcDeck[fcIdx].id;
+  if(correct) wrongs.delete(id); else wrongs.add(id);
+  saveWrongs();
+  fcGroups();  /* 오답 칩 개수 갱신 */
+  if(fcGroup==='__wrong__'&&correct){
+    /* 오답 덱 복습 중 맞음 → 카드가 덱에서 빠지고 다음 카드가 그 자리로 */
+    const keep=fcIdx;
+    fcDeck=fcDeck.filter(c=>c.id!==id);
+    fcIdx=fcDeck.length?keep%fcDeck.length:0;
+    fcFlipped=false;renderCard();
+  }else{
+    nextCard();
+  }
+}
+
+/* ---------- 발음(TTS): 브라우저 내장 음성합성 — 영어가 보일 때 자동 재생 + 🔊 다시 듣기 ---------- */
+const TTS_KEY='ub_eng_tts';
+let autoTts=true;
+try{ const v=localStorage.getItem(TTS_KEY); if(v!==null) autoTts=(v==='1'); }catch(e){}
+function speak(txt){
+  if(!('speechSynthesis' in window)||!txt)return;
+  try{
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(txt);
+    u.lang='en-US';u.rate=0.95;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+function speakCard(){ if(fcDeck.length) speak(fcDeck[fcIdx].en); }
+function toggleTts(){
+  autoTts=!autoTts;
+  try{ localStorage.setItem(TTS_KEY,autoTts?'1':'0'); }catch(e){}
+  updateTtsBtn();
+  if(autoTts) speakCard();
+  else try{ speechSynthesis.cancel(); }catch(e){}
+}
+function updateTtsBtn(){
+  const b=$('fc-tts');
+  b.textContent=autoTts?'🔊 발음 켬':'🔇 발음 끔';
+  b.classList.toggle('active',autoTts);
+}
+
 /* ---------- 클라우드 동기화 (같은 도메인 중계: /api/sync) ----------
    여러 기기에서 즐겨찾기 공유. 실패해도 localStorage로 정상 동작. */
 const SYNC_URL='/api/sync';
@@ -386,10 +461,11 @@ function setSyncStatus(txt,color){
   const el=$('syncstatus'); if(!el)return;
   el.textContent=txt; el.style.color=color||'#999';
 }
-function _applyBookmarks(){
+function _applyCloud(){
   try{ localStorage.setItem(BM_KEY,JSON.stringify([...bookmarks])); }catch(e){}
+  try{ localStorage.setItem(WRONG_KEY,JSON.stringify([...wrongs])); }catch(e){}
   updateBmBtn(); fcGroups();
-  if(fcGroup==='__bm__'){ fcTopics(); buildDeck(); }
+  if(fcGroup==='__bm__'||fcGroup==='__wrong__'){ fcTopics(); buildDeck(); }
 }
 async function cloudPull(){
   setSyncStatus('☁ 동기화 확인 중…','#999');
@@ -397,23 +473,25 @@ async function cloudPull(){
     const r=await fetch(SYNC_URL,{cache:'no-store'});
     if(!r.ok) throw 0;
     const j=await r.json();
-    const cloud=(j&&Array.isArray(j.ids))?j.ids:[];
+    const cIds=(j&&Array.isArray(j.ids))?j.ids:[];
+    const cWr=(j&&Array.isArray(j.wrongs))?j.wrongs:[];
     if(!localStorage.getItem(SYNCED_KEY)){
-      /* 최초 연결: 기존 로컬 즐겨찾기를 잃지 않게 클라우드와 합침 */
-      const before=bookmarks.size;
-      cloud.forEach(id=>bookmarks.add(id));
-      _applyBookmarks();
+      /* 최초 연결: 기존 로컬 데이터를 잃지 않게 클라우드와 합침 */
+      const before=bookmarks.size+wrongs.size;
+      cIds.forEach(id=>bookmarks.add(id));
+      cWr.forEach(id=>wrongs.add(id));
+      _applyCloud();
       try{ localStorage.setItem(SYNCED_KEY,'1'); }catch(e){}
       if(before>0) cloudPush();  /* 로컬에만 있던 항목을 클라우드에 올림 */
-    }else if(cloud.length===0 && bookmarks.size>0){
+    }else if(cIds.length===0 && cWr.length===0 && (bookmarks.size>0||wrongs.size>0)){
       /* 안전장치: 빈 클라우드(저장소 유실·초기화)가 로컬을 지우지 않게 — 대신 로컬을 올림 */
       cloudPush();
     }else{
       /* 이후엔 클라우드 기준 — 다른 기기의 삭제도 반영 */
-      bookmarks=new Set(cloud);
-      _applyBookmarks();
+      bookmarks=new Set(cIds); wrongs=new Set(cWr);
+      _applyCloud();
     }
-    setSyncStatus('☁ 동기화됨 · 즐겨찾기 '+bookmarks.size+'개','#2a8a5a');
+    setSyncStatus('☁ 동기화됨 · ★'+bookmarks.size+' · ✗'+wrongs.size,'#2a8a5a');
   }catch(e){
     setSyncStatus('⚠ 오프라인 — 이 기기에만 저장됨','#b8702a');
   }
@@ -423,9 +501,9 @@ function cloudPush(){
   setSyncStatus('☁ 동기화 중…','#999');
   _syncTimer=setTimeout(async()=>{
     try{
-      const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[...bookmarks]})});
+      const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[...bookmarks],wrongs:[...wrongs]})});
       if(!r.ok) throw 0;
-      setSyncStatus('☁ 동기화됨 · 즐겨찾기 '+bookmarks.size+'개','#2a8a5a');
+      setSyncStatus('☁ 동기화됨 · ★'+bookmarks.size+' · ✗'+wrongs.size,'#2a8a5a');
     }catch(e){
       setSyncStatus('⚠ 저장 대기 — 오프라인','#b8702a');
     }
@@ -436,6 +514,8 @@ function buildDeck(){
   fcDeck=DB.recall.filter(r=>{
     if(fcGroup==='__bm__'){
       if(!bookmarks.has(r.id))return false;
+    } else if(fcGroup==='__wrong__'){
+      if(!wrongs.has(r.id))return false;
     } else if(fcGroup!=='all'&&r.group!==fcGroup){
       return false;
     }
@@ -450,6 +530,7 @@ function fcGroups(){
   let c=`<button class="fc-g ${fcGroup==='all'?'on':''}" data-g="all">전체</button>`;
   const bmCount=bookmarks.size;
   c+=`<button class="fc-g bookmark ${fcGroup==='__bm__'?'on':''}" data-g="__bm__">⭐ 북마크 (${bmCount})</button>`;
+  c+=`<button class="fc-g wrongdeck ${fcGroup==='__wrong__'?'on':''}" data-g="__wrong__">✗ 오답 (${wrongs.size})</button>`;
   GROUP_ORDER.forEach(g=>{
     const n=DB.recall.filter(r=>r.group===g).length;
     if(n) c+=`<button class="fc-g ${fcGroup===g?'on':''}" data-g="${g}">${g}</button>`;
@@ -478,6 +559,10 @@ function fcTopics(){
     pool=DB.recall.filter(r=>bookmarks.has(r.id));
     label='북마크 전체'; isFilterGroup=true;
     if(!pool.length){ box.classList.add('hide'); box.innerHTML=''; return; }
+  } else if(viewGroup==='__wrong__'){
+    pool=DB.recall.filter(r=>wrongs.has(r.id));
+    label='오답 전체'; isFilterGroup=true;
+    if(!pool.length){ box.classList.add('hide'); box.innerHTML=''; return; }
   } else if(viewGroup==='__card__'){
     // '전체' 필터 중 카드 따라 표시: 현재 카드 그룹의 토픽들 (필터는 안 걸림)
     pool=DB.recall.filter(r=>r.group===curCardGroup);
@@ -492,7 +577,7 @@ function fcTopics(){
   // 칩 그리기: on=선택된 필터(진한 채움), current=현재 카드 토픽(테두리)
   function chip(t,txt){
     const isOn = isFilterGroup && fcTopic===t;
-    const isCur = (t===curCardTopic) && (viewGroup==='__card__' ? true : (fcGroup===curCardGroup||fcGroup==='__bm__'));
+    const isCur = (t===curCardTopic) && (viewGroup==='__card__' ? true : (fcGroup===curCardGroup||fcGroup==='__bm__'||fcGroup==='__wrong__'));
     let cls='fc-t';
     if(isOn) cls+=' on';
     if(isCur) cls+=' current';
@@ -534,14 +619,20 @@ function fcTools(){
 }
 function renderCard(){
   if(!fcDeck.length){
-    $('cardtext').textContent= fcGroup==='__bm__'?'북마크한 카드가 없어요 ☆ 눌러서 추가':'카드 없음';
+    $('cardtext').textContent= fcGroup==='__bm__'?'북마크한 카드가 없어요 ☆ 눌러서 추가'
+      : fcGroup==='__wrong__'?'오답이 비었어요 — 정답 확인 후 ✗ 틀림 누른 카드가 쌓입니다'
+      : '카드 없음';
     $('fccount').textContent='0 / 0';
     $('cardbm').style.display='none';
+    $('cardtts').style.display='none';
+    $('fc-grade').classList.add('hide');
     $('cardorigin').textContent='';
     curCardGroup=null; curCardTopic=null;
     return;
   }
   $('cardbm').style.display='block';
+  $('cardtts').style.display='block';
+  $('fc-grade').classList.toggle('hide',!fcFlipped);
   const c=fcDeck[fcIdx];
   // 앞면 언어 = fcFront, 뒤집으면 반대 면
   const showingFront = !fcFlipped;
@@ -551,6 +642,7 @@ function renderCard(){
   const cls = showingFront ? 'q' : 'a';
   $('cardside').textContent = (lang==='ko') ? 'KOREAN' : 'ENGLISH';
   $('cardtext').innerHTML = `<span class="${cls}">${txt}</span>`;
+  if(lang==='en'&&autoTts) speak(c.en);
   if(showingFront){
     $('cardhint').textContent='탭=정답 보기';
   } else {
@@ -566,6 +658,7 @@ function renderCard(){
   highlightCurrentGroup(c.group);
   fcTopics();           // 현재 카드 따라 토픽 영역 표시 갱신
   updateBmBtn();
+  savePos();
 }
 function highlightCurrentGroup(grp){
   $('fc-groups').querySelectorAll('.fc-g').forEach(b=>{
@@ -581,7 +674,49 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
   t.classList.add('active');$(t.dataset.p).classList.add('active');
+  savePos();
 });
+
+/* ---------- 조작: 키보드(PC) + 스와이프(모바일) ---------- */
+document.addEventListener('keydown',e=>{
+  const tg=e.target;
+  if(tg&&(tg.tagName==='INPUT'||tg.tagName==='TEXTAREA'))return;
+  if(!$('drill').classList.contains('active'))return;
+  if(e.code==='Space'){e.preventDefault();flip();}
+  else if(e.key==='ArrowRight'){nextCard();}
+  else if(e.key==='ArrowLeft'){prevCard();}
+  else if(e.key==='1'){gradeCard(false);}
+  else if(e.key==='2'){gradeCard(true);}
+});
+let _swX=0,_swY=0;
+$('card').addEventListener('touchstart',e=>{_swX=e.touches[0].clientX;_swY=e.touches[0].clientY;},{passive:true});
+$('card').addEventListener('touchend',e=>{
+  const dx=e.changedTouches[0].clientX-_swX, dy=e.changedTouches[0].clientY-_swY;
+  if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)*1.5){ if(dx<0)nextCard(); else prevCard(); }
+},{passive:true});
+
+/* ---------- 마지막 위치 기억: 탭·필터·카드 위치·방향 ---------- */
+const POS_KEY='ub_eng_pos';
+function savePos(){
+  try{
+    const at=document.querySelector('.tab.active');
+    localStorage.setItem(POS_KEY,JSON.stringify({
+      tab:at?at.dataset.p:'phrases',
+      g:fcGroup,t:fcTopic,w:fcWeek,idx:fcIdx,front:fcFront
+    }));
+  }catch(e){}
+}
+let _pos=null;
+try{ _pos=JSON.parse(localStorage.getItem(POS_KEY)||'null'); }catch(e){}
+if(_pos){
+  if(_pos.g)fcGroup=_pos.g;
+  if(_pos.t)fcTopic=_pos.t;
+  if(_pos.w)fcWeek=_pos.w;
+  if(_pos.front==='en'){
+    fcFront='en';
+    const b=$('fc-dir'); b.textContent='🔄 영어 먼저'; b.classList.add('active');
+  }
+}
 
 /* ---------- INIT ---------- */
 phChips();phRender();
@@ -589,6 +724,11 @@ patChips();patRender();
 senChips();senRender();
 narrRender();
 fcGroups();fcTopics();fcTools();buildDeck();
+if(_pos&&typeof _pos.idx==='number'&&_pos.idx>0&&_pos.idx<fcDeck.length){ fcIdx=_pos.idx; renderCard(); }
+if(_pos&&_pos.tab&&_pos.tab!=='phrases'){
+  const t=document.querySelector(`.tab[data-p="${_pos.tab}"]`); if(t)t.click();
+}
+updateTtsBtn();
 cloudPull();
 </script>
 </body>

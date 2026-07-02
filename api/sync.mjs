@@ -1,6 +1,7 @@
 // /api/sync — 영어 플래시카드 학습 데이터 동기화용 중계 함수
 // 브라우저(같은 도메인) ↔ 이 함수 ↔ Upstash Redis(Vercel 마켓플레이스, 계정 귀속이라 유실 없음)
-// 저장 대상: 즐겨찾기 id 목록(ids) + 오답 덱 id 목록(wrongs). 개인 학습 데이터뿐이라 인증/암호화 없음.
+// 저장 대상: 즐겨찾기(ids) + 오답 덱(wrongs) + 간격반복 상태(srs) + 일별 학습 통계(stats).
+// 개인 학습 데이터뿐이라 인증/암호화 없음.
 //
 // Upstash 미연결(환경변수 없음) 시엔 기존 jsonblob으로 폴백.
 // Redis가 비어 있으면 첫 GET 때 jsonblob 데이터를 자동 이관(일회성 시드).
@@ -20,10 +21,16 @@ function cleanList(v) {
   return Array.isArray(v) ? v.filter((x) => typeof x === 'string').slice(0, 5000) : null;
 }
 
+function cleanObj(v) {
+  return v && typeof v === 'object' && !Array.isArray(v) ? v : null;
+}
+
 function pack(data) {
   return {
     ids: (data && cleanList(data.ids)) || [],
     wrongs: (data && cleanList(data.wrongs)) || [],
+    srs: (data && cleanObj(data.srs)) || {},
+    stats: (data && cleanObj(data.stats)) || {},
   };
 }
 
@@ -45,7 +52,7 @@ async function redisSet(env, data) {
   const r = await fetch(`${env.url}/set/${KEY}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${env.token}` },
-    body: JSON.stringify({ ids: data.ids, wrongs: data.wrongs, updated: Date.now() }),
+    body: JSON.stringify({ ids: data.ids, wrongs: data.wrongs, srs: data.srs, stats: data.stats, updated: Date.now() }),
   });
   if (!r.ok) throw new Error('redis write ' + r.status);
 }
@@ -60,7 +67,7 @@ async function blobSet(data) {
   const r = await fetch(BLOB, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ ids: data.ids, wrongs: data.wrongs, updated: Date.now() }),
+    body: JSON.stringify({ ids: data.ids, wrongs: data.wrongs, srs: data.srs, stats: data.stats, updated: Date.now() }),
   });
   if (!r.ok) throw new Error('write ' + r.status);
 }
@@ -89,14 +96,18 @@ export default async function handler(req, res) {
       if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { body = {}; } }
       const ids = (body && cleanList(body.ids)) || [];
       let wrongs = body ? cleanList(body.wrongs) : null;
-      if (wrongs === null) {
-        // 구버전 클라이언트(wrongs 필드 없음): 저장돼 있던 오답 덱을 지우지 않게 보존
+      let srs = body ? cleanObj(body.srs) : null;
+      let stats = body ? cleanObj(body.stats) : null;
+      if (wrongs === null || srs === null || stats === null) {
+        // 구버전 클라이언트(필드 없음): 저장돼 있던 데이터를 지우지 않게 보존
         try {
           const cur = env ? await redisGet(env) : await blobGet();
-          wrongs = (cur && cur.wrongs) || [];
-        } catch (e) { wrongs = []; }
+          if (wrongs === null) wrongs = (cur && cur.wrongs) || [];
+          if (srs === null) srs = (cur && cur.srs) || {};
+          if (stats === null) stats = (cur && cur.stats) || {};
+        } catch (e) { wrongs = wrongs || []; srs = srs || {}; stats = stats || {}; }
       }
-      const data = { ids, wrongs };
+      const data = { ids, wrongs, srs, stats };
       if (env) await redisSet(env, data);
       else await blobSet(data);
       return res.status(200).json({ ok: true, n: ids.length, w: wrongs.length });

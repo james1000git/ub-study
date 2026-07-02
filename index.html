@@ -150,6 +150,17 @@
   .card .tts:active{transform:scale(1.2);}
   .fc-g.wrongdeck.on{background:var(--accent);border-color:var(--accent);color:#fff;}
 
+  /* 간격 반복(오늘 복습) + 통계 */
+  .fc-g.duedeck.has{border-color:var(--green);color:var(--green);font-weight:800;}
+  .fc-g.duedeck.on{background:var(--green);border-color:var(--green);color:#fff;}
+  .fc-statsbox{width:100%;max-width:430px;background:var(--card);border:1px solid var(--line);
+    border-radius:8px;padding:12px 14px;margin-bottom:10px;font-size:12.5px;}
+  .fc-statsbox.hide{display:none;}
+  .fc-statsbox .row{display:flex;justify-content:space-between;align-items:baseline;margin:3px 0;}
+  .fc-statsbox .bar{height:5px;background:#eee6d8;border-radius:3px;overflow:hidden;margin:2px 0 7px;}
+  .fc-statsbox .bar i{display:block;height:100%;background:var(--green);}
+  .fc-statsbox h4{margin:9px 0 4px;font-size:10.5px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;}
+
   footer{text-align:center;font-size:10px;color:var(--muted);padding:20px 16px 30px;
     border-top:1px solid var(--line);margin-top:22px;}
   .empty{text-align:center;color:var(--muted);font-size:13px;padding:30px 0;}
@@ -166,7 +177,7 @@
     /* 플래시카드 큼직하게 */
     .card{max-width:640px;min-height:300px;padding:40px 28px;}
     .card .q{font-size:23px;} .card .a{font-size:22px;}
-    .fc-nav,.fc-grade{max-width:640px;}
+    .fc-nav,.fc-grade,.fc-statsbox{max-width:640px;}
   }
   @media (min-width:1180px){
     /* 더 넓으면 표현·패턴·문장은 3열 */
@@ -179,7 +190,7 @@
   <div class="kicker">UB · English · Full Database</div>
   <h1>The <span class="red">Whole</span> Library</h1>
   <div class="sub">Day 1–20 전체 · 패턴 115 · 표현 260 · 문장 181 · 서사 15 · Recall 205</div>
-  <div class="stamp">v2.1</div>
+  <div class="stamp">v2.2</div>
 </header>
 
 <nav id="nav">
@@ -224,7 +235,7 @@
   </section>
 
   <section class="panel" id="drill">
-    <p class="lead">한국어 보고 영어 맞히기 · 탭=정답 → ✓맞음/✗틀림 누르면 오답 덱에 쌓임 · 카드 스와이프=이동 · PC: Space=뒤집기, ←→=이동, 1=틀림, 2=맞음</p>
+    <p class="lead">탭=정답 → ✓맞음/✗틀림 평가 · 맞을수록 복습 간격이 늘고(1→3→7일…) 예정 카드는 📅 오늘에 모임 · 틀린 카드는 ✗오답 덱 · 스와이프=이동 · PC: Space=뒤집기, ←→=이동, 1=틀림, 2=맞음</p>
     <div class="fc-wrap">
       <div class="fc-groups" id="fc-groups"></div>
       <div id="syncstatus" style="font-size:11px;text-align:center;margin:2px 0 4px;min-height:14px;color:#999;"></div>
@@ -233,8 +244,10 @@
         <button class="fc-dir" id="fc-dir" onclick="toggleDir()">🔄 한국어 먼저</button>
         <button class="fc-dir" id="fc-tts" onclick="toggleTts()">🔊 발음 켬</button>
         <button class="fc-weektoggle" id="fc-weektoggle" onclick="toggleWeekBox()">⚙︎ Week 필터 · 셔플</button>
+        <button class="fc-weektoggle" id="fc-statstoggle" onclick="toggleStats()">📊 통계</button>
       </div>
       <div class="fc-weekbox hide" id="fc-tools"></div>
+      <div class="fc-statsbox hide" id="fc-stats"></div>
       <div class="card" id="card" onclick="flip()">
         <div class="bm" id="cardbm" onclick="event.stopPropagation();toggleBm()">☆</div>
         <div class="tts" id="cardtts" onclick="event.stopPropagation();speakCard()">🔊</div>
@@ -404,18 +417,54 @@ try{
   const savedW=localStorage.getItem(WRONG_KEY);
   if(savedW) wrongs=new Set(JSON.parse(savedW));
 }catch(e){}
-function saveWrongs(){
-  try{ localStorage.setItem(WRONG_KEY,JSON.stringify([...wrongs])); }catch(e){}
+/* ---------- 간격 반복(라이트너): 카드별 다음 복습일 + 일별 학습 통계 ---------- */
+const SRS_KEY='ub_eng_srs', STATS_KEY='ub_eng_stats';
+let srs={}, stats={};
+try{ srs=JSON.parse(localStorage.getItem(SRS_KEY)||'{}')||{}; }catch(e){srs={};}
+try{ stats=JSON.parse(localStorage.getItem(STATS_KEY)||'{}')||{}; }catch(e){stats={};}
+const INTERVALS=[1,3,7,14,30,60]; /* 박스 1~6의 다음 복습 간격(일) */
+function fmtDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function todayStr(){ return fmtDate(new Date()); }
+function addDays(n){ const d=new Date(); d.setDate(d.getDate()+n); return fmtDate(d); }
+function isDue(id){ const e=srs[id]; return !!(e&&e.due&&e.due<=todayStr()); }
+function dueCount(){ let n=0; for(const id in srs){ if(isDue(id))n++; } return n; }
+function saveSrs(){
+  try{ localStorage.setItem(SRS_KEY,JSON.stringify(srs)); }catch(e){}
+  try{ localStorage.setItem(STATS_KEY,JSON.stringify(stats)); }catch(e){}
   cloudPush();
 }
+/* 통계는 최근 90일만 유지 */
+(function pruneStats(){
+  const cut=fmtDate(new Date(Date.now()-90*864e5));
+  for(const k in stats){ if(k<cut) delete stats[k]; }
+})();
+function calcStreak(){
+  let n=0; const d=new Date();
+  if(!stats[fmtDate(d)]) d.setDate(d.getDate()-1); /* 오늘 아직 안 했으면 어제까지의 연속 */
+  while(stats[fmtDate(d)]){ n++; d.setDate(d.getDate()-1); }
+  return n;
+}
+
 function gradeCard(correct){
   if(!fcDeck.length||!fcFlipped)return;  /* 정답을 본 뒤에만 평가 가능 */
   const id=fcDeck[fcIdx].id;
   if(correct) wrongs.delete(id); else wrongs.add(id);
-  saveWrongs();
-  fcGroups();  /* 오답 칩 개수 갱신 */
-  if(fcGroup==='__wrong__'&&correct){
-    /* 오답 덱 복습 중 맞음 → 카드가 덱에서 빠지고 다음 카드가 그 자리로 */
+  try{ localStorage.setItem(WRONG_KEY,JSON.stringify([...wrongs])); }catch(e){}
+  /* 라이트너: 맞으면 다음 박스(간격 늘어남), 틀리면 박스 1(내일 다시).
+     첫 평가에 바로 맞은 카드는 박스 2로 — 이미 아는 카드에 시간 낭비 안 함 */
+  const e=srs[id]||{b:0,n:0,w:0,due:null};
+  e.n++;
+  if(correct) e.b = (e.b===0) ? 2 : Math.min(e.b+1,6);
+  else { e.w++; e.b=1; }
+  e.due=addDays(INTERVALS[e.b-1]);
+  srs[id]=e;
+  const t=todayStr(); const day=stats[t]||(stats[t]={r:0,c:0});
+  day.r++; if(correct)day.c++;
+  saveSrs();
+  if(statsOpen)renderStats();
+  fcGroups();  /* 오늘·오답 칩 개수 갱신 */
+  if(fcGroup==='__due__'||(fcGroup==='__wrong__'&&correct)){
+    /* 처리된 카드는 덱에서 빠지고 다음 카드가 그 자리로 */
     const keep=fcIdx;
     fcDeck=fcDeck.filter(c=>c.id!==id);
     fcIdx=fcDeck.length?keep%fcDeck.length:0;
@@ -423,6 +472,34 @@ function gradeCard(correct){
   }else{
     nextCard();
   }
+}
+
+/* ---------- 통계 박스 ---------- */
+let statsOpen=false;
+function toggleStats(){
+  statsOpen=!statsOpen;
+  if(statsOpen)renderStats();
+  $('fc-stats').classList.toggle('hide',!statsOpen);
+  $('fc-statstoggle').classList.toggle('active',statsOpen);
+}
+function renderStats(){
+  const t=todayStr();
+  const td=stats[t]||{r:0,c:0};
+  const started=Object.keys(srs).length;
+  let h=`<div class="row"><span>오늘 학습</span><b>${td.r}장${td.r?` · 정답률 ${Math.round(td.c/td.r*100)}%`:''}</b></div>`;
+  h+=`<div class="row"><span>연속 학습</span><b>🔥 ${calcStreak()}일</b></div>`;
+  h+=`<div class="row"><span>학습 시작한 카드</span><b>${started} / ${DB.recall.length}</b></div>`;
+  h+=`<div class="row"><span>오늘 복습 대기</span><b>${dueCount()}장</b></div>`;
+  let gh='';
+  GROUP_ORDER.forEach(g=>{
+    let n=0,w=0;
+    DB.recall.forEach(r=>{ const e=srs[r.id]; if(r.group===g&&e){n+=e.n;w+=e.w;} });
+    if(!n)return;
+    const p=Math.round((n-w)/n*100);
+    gh+=`<div class="row"><span>${g}</span><b>${p}% <span style="color:var(--muted);font-weight:400">(${n}회)</span></b></div><div class="bar"><i style="width:${p}%"></i></div>`;
+  });
+  if(gh) h+='<h4>그룹별 정답률 (전체 기간)</h4>'+gh;
+  $('fc-stats').innerHTML=h;
 }
 
 /* ---------- 발음(TTS): 브라우저 내장 음성합성 — 영어가 보일 때 자동 재생 + 🔊 다시 듣기 ---------- */
@@ -464,8 +541,11 @@ function setSyncStatus(txt,color){
 function _applyCloud(){
   try{ localStorage.setItem(BM_KEY,JSON.stringify([...bookmarks])); }catch(e){}
   try{ localStorage.setItem(WRONG_KEY,JSON.stringify([...wrongs])); }catch(e){}
+  try{ localStorage.setItem(SRS_KEY,JSON.stringify(srs)); }catch(e){}
+  try{ localStorage.setItem(STATS_KEY,JSON.stringify(stats)); }catch(e){}
   updateBmBtn(); fcGroups();
-  if(fcGroup==='__bm__'||fcGroup==='__wrong__'){ fcTopics(); buildDeck(); }
+  if(statsOpen)renderStats();
+  if(fcGroup==='__bm__'||fcGroup==='__wrong__'||fcGroup==='__due__'){ fcTopics(); buildDeck(); }
 }
 async function cloudPull(){
   setSyncStatus('☁ 동기화 확인 중…','#999');
@@ -475,23 +555,30 @@ async function cloudPull(){
     const j=await r.json();
     const cIds=(j&&Array.isArray(j.ids))?j.ids:[];
     const cWr=(j&&Array.isArray(j.wrongs))?j.wrongs:[];
+    const cSrs=(j&&j.srs&&typeof j.srs==='object'&&!Array.isArray(j.srs))?j.srs:{};
+    const cSt=(j&&j.stats&&typeof j.stats==='object'&&!Array.isArray(j.stats))?j.stats:{};
+    const cloudEmpty = cIds.length===0&&cWr.length===0&&Object.keys(cSrs).length===0;
+    const localHas = bookmarks.size>0||wrongs.size>0||Object.keys(srs).length>0;
     if(!localStorage.getItem(SYNCED_KEY)){
       /* 최초 연결: 기존 로컬 데이터를 잃지 않게 클라우드와 합침 */
-      const before=bookmarks.size+wrongs.size;
+      const before=bookmarks.size+wrongs.size+Object.keys(srs).length;
       cIds.forEach(id=>bookmarks.add(id));
       cWr.forEach(id=>wrongs.add(id));
+      /* srs 충돌 시 복습 횟수 많은 쪽, stats는 일별로 큰 값 */
+      for(const k in cSrs){ if(!srs[k]||((cSrs[k].n||0)>(srs[k].n||0))) srs[k]=cSrs[k]; }
+      for(const k in cSt){ const a=stats[k],b=cSt[k]; stats[k]= a? {r:Math.max(a.r||0,b.r||0),c:Math.max(a.c||0,b.c||0)} : b; }
       _applyCloud();
       try{ localStorage.setItem(SYNCED_KEY,'1'); }catch(e){}
       if(before>0) cloudPush();  /* 로컬에만 있던 항목을 클라우드에 올림 */
-    }else if(cIds.length===0 && cWr.length===0 && (bookmarks.size>0||wrongs.size>0)){
+    }else if(cloudEmpty && localHas){
       /* 안전장치: 빈 클라우드(저장소 유실·초기화)가 로컬을 지우지 않게 — 대신 로컬을 올림 */
       cloudPush();
     }else{
       /* 이후엔 클라우드 기준 — 다른 기기의 삭제도 반영 */
-      bookmarks=new Set(cIds); wrongs=new Set(cWr);
+      bookmarks=new Set(cIds); wrongs=new Set(cWr); srs=cSrs; stats=cSt;
       _applyCloud();
     }
-    setSyncStatus('☁ 동기화됨 · ★'+bookmarks.size+' · ✗'+wrongs.size,'#2a8a5a');
+    setSyncStatus('☁ 동기화됨 · ★'+bookmarks.size+' · ✗'+wrongs.size+' · 📅'+dueCount(),'#2a8a5a');
   }catch(e){
     setSyncStatus('⚠ 오프라인 — 이 기기에만 저장됨','#b8702a');
   }
@@ -501,9 +588,9 @@ function cloudPush(){
   setSyncStatus('☁ 동기화 중…','#999');
   _syncTimer=setTimeout(async()=>{
     try{
-      const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[...bookmarks],wrongs:[...wrongs]})});
+      const r=await fetch(SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[...bookmarks],wrongs:[...wrongs],srs:srs,stats:stats})});
       if(!r.ok) throw 0;
-      setSyncStatus('☁ 동기화됨 · ★'+bookmarks.size+' · ✗'+wrongs.size,'#2a8a5a');
+      setSyncStatus('☁ 동기화됨 · ★'+bookmarks.size+' · ✗'+wrongs.size+' · 📅'+dueCount(),'#2a8a5a');
     }catch(e){
       setSyncStatus('⚠ 저장 대기 — 오프라인','#b8702a');
     }
@@ -516,6 +603,8 @@ function buildDeck(){
       if(!bookmarks.has(r.id))return false;
     } else if(fcGroup==='__wrong__'){
       if(!wrongs.has(r.id))return false;
+    } else if(fcGroup==='__due__'){
+      if(!isDue(r.id))return false;
     } else if(fcGroup!=='all'&&r.group!==fcGroup){
       return false;
     }
@@ -528,6 +617,8 @@ function buildDeck(){
 }
 function fcGroups(){
   let c=`<button class="fc-g ${fcGroup==='all'?'on':''}" data-g="all">전체</button>`;
+  const nDue=dueCount();
+  c+=`<button class="fc-g duedeck ${fcGroup==='__due__'?'on':''}${nDue>0?' has':''}" data-g="__due__">📅 오늘 (${nDue})</button>`;
   const bmCount=bookmarks.size;
   c+=`<button class="fc-g bookmark ${fcGroup==='__bm__'?'on':''}" data-g="__bm__">⭐ 북마크 (${bmCount})</button>`;
   c+=`<button class="fc-g wrongdeck ${fcGroup==='__wrong__'?'on':''}" data-g="__wrong__">✗ 오답 (${wrongs.size})</button>`;
@@ -563,6 +654,10 @@ function fcTopics(){
     pool=DB.recall.filter(r=>wrongs.has(r.id));
     label='오답 전체'; isFilterGroup=true;
     if(!pool.length){ box.classList.add('hide'); box.innerHTML=''; return; }
+  } else if(viewGroup==='__due__'){
+    pool=DB.recall.filter(r=>isDue(r.id));
+    label='오늘 복습 전체'; isFilterGroup=true;
+    if(!pool.length){ box.classList.add('hide'); box.innerHTML=''; return; }
   } else if(viewGroup==='__card__'){
     // '전체' 필터 중 카드 따라 표시: 현재 카드 그룹의 토픽들 (필터는 안 걸림)
     pool=DB.recall.filter(r=>r.group===curCardGroup);
@@ -577,7 +672,7 @@ function fcTopics(){
   // 칩 그리기: on=선택된 필터(진한 채움), current=현재 카드 토픽(테두리)
   function chip(t,txt){
     const isOn = isFilterGroup && fcTopic===t;
-    const isCur = (t===curCardTopic) && (viewGroup==='__card__' ? true : (fcGroup===curCardGroup||fcGroup==='__bm__'||fcGroup==='__wrong__'));
+    const isCur = (t===curCardTopic) && (viewGroup==='__card__' ? true : (fcGroup===curCardGroup||fcGroup==='__bm__'||fcGroup==='__wrong__'||fcGroup==='__due__'));
     let cls='fc-t';
     if(isOn) cls+=' on';
     if(isCur) cls+=' current';
@@ -621,6 +716,7 @@ function renderCard(){
   if(!fcDeck.length){
     $('cardtext').textContent= fcGroup==='__bm__'?'북마크한 카드가 없어요 ☆ 눌러서 추가'
       : fcGroup==='__wrong__'?'오답이 비었어요 — 정답 확인 후 ✗ 틀림 누른 카드가 쌓입니다'
+      : fcGroup==='__due__'?'오늘 복습 끝! 🎉 카드를 평가하면 다음 복습일이 잡힙니다'
       : '카드 없음';
     $('fccount').textContent='0 / 0';
     $('cardbm').style.display='none';
@@ -717,6 +813,8 @@ if(_pos){
     const b=$('fc-dir'); b.textContent='🔄 영어 먼저'; b.classList.add('active');
   }
 }
+/* 오늘 복습할 카드가 있으면 그 덱부터 (직전에 특정 그룹을 골라 보던 중이었다면 그대로 복원) */
+if(dueCount()>0 && (!_pos||!_pos.g||_pos.g==='all')){ fcGroup='__due__'; fcTopic='all'; }
 
 /* ---------- INIT ---------- */
 phChips();phRender();

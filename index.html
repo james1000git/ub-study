@@ -161,6 +161,28 @@
   .fc-statsbox .bar i{display:block;height:100%;background:var(--green);}
   .fc-statsbox h4{margin:9px 0 4px;font-size:10.5px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;}
 
+  /* 쓰기·받아쓰기 모드 */
+  .fc-modes{display:flex;gap:6px;justify-content:center;margin-bottom:8px;}
+  .fc-modes button{font-size:11.5px;font-weight:700;padding:7px 14px;border-radius:16px;
+    background:var(--card);border:1px solid var(--line);color:var(--muted);font-family:inherit;cursor:pointer;}
+  .fc-modes button.on{background:var(--ink);color:var(--paper);border-color:var(--ink);}
+  .fc-type{width:100%;max-width:430px;margin-bottom:10px;}
+  .fc-type.hide{display:none;}
+  .fc-type .inrow{display:flex;gap:8px;}
+  .fc-type input{flex:1;min-width:0;padding:12px;font-size:16px;font-family:inherit;
+    border:1px solid var(--line);border-radius:8px;background:var(--card);}
+  .fc-type .inrow button{padding:12px 18px;border:1px solid var(--ink);background:var(--ink);
+    color:var(--paper);border-radius:8px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;}
+  #type-result{margin-top:9px;font-size:14.5px;line-height:1.7;}
+  #type-result .type-verdict{font-weight:800;margin-bottom:4px;}
+  #type-result .type-verdict.good{color:var(--green);}
+  #type-result .type-verdict.bad{color:var(--accent);}
+  #type-result .type-ans{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:9px 12px;}
+  #type-result .type-ko{font-size:12px;color:var(--muted);margin-top:5px;}
+  #type-result .type-mine{font-size:12.5px;color:var(--muted);margin-top:5px;}
+  .tw.ok{color:var(--green);}
+  .tw.no{color:var(--accent);font-weight:800;text-decoration:underline;}
+
   footer{text-align:center;font-size:10px;color:var(--muted);padding:20px 16px 30px;
     border-top:1px solid var(--line);margin-top:22px;}
   .empty{text-align:center;color:var(--muted);font-size:13px;padding:30px 0;}
@@ -177,7 +199,7 @@
     /* 플래시카드 큼직하게 */
     .card{max-width:640px;min-height:300px;padding:40px 28px;}
     .card .q{font-size:23px;} .card .a{font-size:22px;}
-    .fc-nav,.fc-grade,.fc-statsbox{max-width:640px;}
+    .fc-nav,.fc-grade,.fc-statsbox,.fc-type{max-width:640px;}
   }
   @media (min-width:1180px){
     /* 더 넓으면 표현·패턴·문장은 3열 */
@@ -190,7 +212,7 @@
   <div class="kicker">UB · English · Full Database</div>
   <h1>The <span class="red">Whole</span> Library</h1>
   <div class="sub">Day 1–20 전체 · 패턴 115 · 표현 260 · 문장 181 · 서사 15 · Recall 205</div>
-  <div class="stamp">v2.2</div>
+  <div class="stamp">v2.3</div>
 </header>
 
 <nav id="nav">
@@ -240,6 +262,11 @@
       <div class="fc-groups" id="fc-groups"></div>
       <div id="syncstatus" style="font-size:11px;text-align:center;margin:2px 0 4px;min-height:14px;color:#999;"></div>
       <div class="fc-topics hide" id="fc-topics"></div>
+      <div class="fc-modes" id="fc-modes">
+        <button data-m="card" class="on">🃏 카드</button>
+        <button data-m="type">⌨️ 쓰기</button>
+        <button data-m="dict">🎧 받아쓰기</button>
+      </div>
       <div style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:0;">
         <button class="fc-dir" id="fc-dir" onclick="toggleDir()">🔄 한국어 먼저</button>
         <button class="fc-dir" id="fc-tts" onclick="toggleTts()">🔊 발음 켬</button>
@@ -259,6 +286,13 @@
       <div class="fc-grade hide" id="fc-grade">
         <button class="wrong" onclick="gradeCard(false)">✗ 틀림</button>
         <button class="right" onclick="gradeCard(true)">✓ 맞음</button>
+      </div>
+      <div class="fc-type hide" id="fc-type">
+        <div class="inrow">
+          <input id="type-input" placeholder="영어로 입력…" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+          <button id="type-submit" onclick="submitType()">확인</button>
+        </div>
+        <div id="type-result"></div>
       </div>
       <div class="fc-nav">
         <button class="ghost" onclick="prevCard()">← 이전</button>
@@ -445,9 +479,7 @@ function calcStreak(){
   return n;
 }
 
-function gradeCard(correct){
-  if(!fcDeck.length||!fcFlipped)return;  /* 정답을 본 뒤에만 평가 가능 */
-  const id=fcDeck[fcIdx].id;
+function applyGrade(id,correct){
   if(correct) wrongs.delete(id); else wrongs.add(id);
   try{ localStorage.setItem(WRONG_KEY,JSON.stringify([...wrongs])); }catch(e){}
   /* 라이트너: 맞으면 다음 박스(간격 늘어남), 틀리면 박스 1(내일 다시).
@@ -463,6 +495,8 @@ function gradeCard(correct){
   saveSrs();
   if(statsOpen)renderStats();
   fcGroups();  /* 오늘·오답 칩 개수 갱신 */
+}
+function advanceAfterGrade(id,correct){
   if(fcGroup==='__due__'||(fcGroup==='__wrong__'&&correct)){
     /* 처리된 카드는 덱에서 빠지고 다음 카드가 그 자리로 */
     const keep=fcIdx;
@@ -472,6 +506,85 @@ function gradeCard(correct){
   }else{
     nextCard();
   }
+}
+function gradeCard(correct){
+  if(!fcDeck.length||!fcFlipped)return;  /* 정답을 본 뒤에만 평가 가능 */
+  const id=fcDeck[fcIdx].id;
+  applyGrade(id,correct);
+  advanceAfterGrade(id,correct);
+}
+
+/* ---------- 쓰기·받아쓰기 모드: 타이핑 후 단어 단위 비교, 자동 채점 ---------- */
+let fcMode='card', typeStage='input', lastTypeOk=false;
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function normWord(w){ return w.toLowerCase().replace(/[’‘]/g,"'").replace(/[^a-z0-9']+/g,''); }
+function diffWords(a,b){
+  /* LCS 정렬로 단어 매칭 — a=정답, b=입력 */
+  const m=a.length,n=b.length;
+  const dp=Array.from({length:m+1},()=>new Array(n+1).fill(0));
+  for(let i=m-1;i>=0;i--)for(let j=n-1;j>=0;j--)
+    dp[i][j]=(a[i]===b[j])?dp[i+1][j+1]+1:Math.max(dp[i+1][j],dp[i][j+1]);
+  const matched=new Array(m).fill(false), typedMatched=new Array(n).fill(false);
+  let i=0,j=0;
+  while(i<m&&j<n){
+    if(a[i]===b[j]){matched[i]=true;typedMatched[j]=true;i++;j++;}
+    else if(dp[i+1][j]>=dp[i][j+1])i++; else j++;
+  }
+  return {matched,typedMatched};
+}
+function resetTypeUI(){
+  typeStage='input'; lastTypeOk=false;
+  const inp=$('type-input'); if(!inp)return;
+  const keep=(document.activeElement===inp);
+  inp.readOnly=false; inp.value='';
+  $('type-result').innerHTML='';
+  $('type-submit').textContent='확인';
+  if(keep)inp.focus();
+}
+function submitType(){
+  if(!fcDeck.length)return;
+  const c=fcDeck[fcIdx];
+  const inp=$('type-input');
+  if(typeStage==='result'){
+    /* 다음 카드로 */
+    const wasFocused=(document.activeElement===inp)||true;
+    advanceAfterGrade(c.id,lastTypeOk);
+    if(wasFocused)$('type-input').focus();
+    return;
+  }
+  const typedRaw=inp.value.trim();
+  if(!typedRaw)return;
+  /* 정답 단어(문장부호 제외) vs 입력 단어 비교 */
+  const raw=c.en.split(/\s+/);
+  const tN=[],tIdx=[];
+  raw.forEach((w,i)=>{ const nw=normWord(w); if(nw){tN.push(nw);tIdx.push(i);} });
+  const uRaw=typedRaw.split(/\s+/).filter(Boolean);
+  const uN=uRaw.map(normWord);
+  const d=diffWords(tN,uN);
+  const ok=d.matched.every(Boolean)&&d.typedMatched.every(Boolean);
+  const ansH=raw.map((w,i)=>{
+    const k=tIdx.indexOf(i);
+    return k<0 ? `<span>${esc(w)}</span>` : `<span class="tw ${d.matched[k]?'ok':'no'}">${esc(w)}</span>`;
+  }).join(' ');
+  let h=`<div class="type-verdict ${ok?'good':'bad'}">${ok?'✓ 정답!':'✗ 오답 — 빨간 단어를 놓쳤어요'}</div>`;
+  h+=`<div class="type-ans">${ansH}</div>`;
+  if(fcMode==='dict') h+=`<div class="type-ko">${esc(c.ko)}</div>`;
+  if(!ok){
+    const mineH=uRaw.map((w,j)=>`<span class="tw ${d.typedMatched[j]?'ok':'no'}">${esc(w)}</span>`).join(' ');
+    h+=`<div class="type-mine">내 입력: ${mineH}</div>`;
+  }
+  $('type-result').innerHTML=h;
+  if(autoTts&&fcMode==='type') speak(c.en);
+  applyGrade(c.id,ok);
+  lastTypeOk=ok; typeStage='result';
+  inp.readOnly=true;
+  $('type-submit').textContent='다음 →';
+}
+function setMode(m){
+  if(m==='dict'&&!('speechSynthesis' in window))return;
+  fcMode=m; fcFlipped=false;
+  document.querySelectorAll('#fc-modes button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+  renderCard();
 }
 
 /* ---------- 통계 박스 ---------- */
@@ -722,14 +835,32 @@ function renderCard(){
     $('cardbm').style.display='none';
     $('cardtts').style.display='none';
     $('fc-grade').classList.add('hide');
+    $('fc-type').classList.add('hide');
     $('cardorigin').textContent='';
     curCardGroup=null; curCardTopic=null;
     return;
   }
   $('cardbm').style.display='block';
   $('cardtts').style.display='block';
-  $('fc-grade').classList.toggle('hide',!fcFlipped);
   const c=fcDeck[fcIdx];
+  if(fcMode!=='card'){
+    /* 쓰기·받아쓰기: 카드는 문제만 보여주고 입력창으로 답함 */
+    $('fc-grade').classList.add('hide');
+    $('fc-type').classList.remove('hide');
+    resetTypeUI();
+    if(fcMode==='type'){
+      $('cardside').textContent='KOREAN';
+      $('cardtext').innerHTML=`<span class="q">${c.ko}</span>`;
+      $('cardhint').textContent='영어로 입력 → Enter';
+    }else{
+      $('cardside').textContent='LISTENING';
+      $('cardtext').innerHTML='<span class="q">🎧</span>';
+      $('cardhint').textContent='들리는 대로 입력 · 카드 탭=다시 듣기';
+      speak(c.en);
+    }
+  }else{
+  $('fc-type').classList.add('hide');
+  $('fc-grade').classList.toggle('hide',!fcFlipped);
   // 앞면 언어 = fcFront, 뒤집으면 반대 면
   const showingFront = !fcFlipped;
   const lang = showingFront ? fcFront : (fcFront==='ko'?'en':'ko');
@@ -744,6 +875,7 @@ function renderCard(){
   } else {
     const backIsKo = (fcFront==='en');
     $('cardhint').textContent= backIsKo ? '탭=영어 · 다음 →' : '탭=한국어 · 다음 →';
+  }
   }
   $('fccount').textContent=`${fcIdx+1} / ${fcDeck.length}`;
   // 카드 내 원본 위치(대분류 · 토픽 · Week · 문항번호)
@@ -761,7 +893,11 @@ function highlightCurrentGroup(grp){
     b.classList.toggle('current', b.dataset.g===grp);
   });
 }
-function flip(){fcFlipped=!fcFlipped;renderCard();}
+function flip(){
+  if(fcMode==='type')return;                 /* 쓰기: 카드 탭으로 정답 안 보임 */
+  if(fcMode==='dict'){speakCard();return;}   /* 받아쓰기: 탭=다시 듣기 */
+  fcFlipped=!fcFlipped;renderCard();
+}
 function nextCard(){if(fcDeck.length){fcIdx=(fcIdx+1)%fcDeck.length;fcFlipped=false;renderCard();}}
 function prevCard(){if(fcDeck.length){fcIdx=(fcIdx-1+fcDeck.length)%fcDeck.length;fcFlipped=false;renderCard();}}
 
@@ -784,6 +920,11 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='1'){gradeCard(false);}
   else if(e.key==='2'){gradeCard(true);}
 });
+document.querySelectorAll('#fc-modes button').forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+$('type-input').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();submitType();} });
+if(!('speechSynthesis' in window)){
+  const db=document.querySelector('#fc-modes [data-m="dict"]'); if(db)db.style.display='none';
+}
 let _swX=0,_swY=0;
 $('card').addEventListener('touchstart',e=>{_swX=e.touches[0].clientX;_swY=e.touches[0].clientY;},{passive:true});
 $('card').addEventListener('touchend',e=>{
@@ -798,7 +939,7 @@ function savePos(){
     const at=document.querySelector('.tab.active');
     localStorage.setItem(POS_KEY,JSON.stringify({
       tab:at?at.dataset.p:'phrases',
-      g:fcGroup,t:fcTopic,w:fcWeek,idx:fcIdx,front:fcFront
+      g:fcGroup,t:fcTopic,w:fcWeek,idx:fcIdx,front:fcFront,m:fcMode
     }));
   }catch(e){}
 }
@@ -823,6 +964,7 @@ senChips();senRender();
 narrRender();
 fcGroups();fcTopics();fcTools();buildDeck();
 if(_pos&&typeof _pos.idx==='number'&&_pos.idx>0&&_pos.idx<fcDeck.length){ fcIdx=_pos.idx; renderCard(); }
+if(_pos&&_pos.m&&_pos.m!=='card') setMode(_pos.m);
 if(_pos&&_pos.tab&&_pos.tab!=='phrases'){
   const t=document.querySelector(`.tab[data-p="${_pos.tab}"]`); if(t)t.click();
 }

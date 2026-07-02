@@ -380,7 +380,7 @@ function updateBmBtn(){
 /* ---------- 클라우드 동기화 (같은 도메인 중계: /api/sync) ----------
    여러 기기에서 즐겨찾기 공유. 실패해도 localStorage로 정상 동작. */
 const SYNC_URL='/api/sync';
-const SYNCED_KEY='ub_eng_synced'; /* 이 기기가 최초 동기화를 마쳤는지 */
+const SYNCED_KEY='ub_eng_synced2'; /* 이 기기가 최초 동기화를 마쳤는지 — blob 교체(2026-07) 시 키를 올려 전 기기 재합집합 유도 */
 let _syncTimer=null;
 function setSyncStatus(txt,color){
   const el=$('syncstatus'); if(!el)return;
@@ -405,6 +405,9 @@ async function cloudPull(){
       _applyBookmarks();
       try{ localStorage.setItem(SYNCED_KEY,'1'); }catch(e){}
       if(before>0) cloudPush();  /* 로컬에만 있던 항목을 클라우드에 올림 */
+    }else if(cloud.length===0 && bookmarks.size>0){
+      /* 안전장치: 빈 클라우드(저장소 유실·초기화)가 로컬을 지우지 않게 — 대신 로컬을 올림 */
+      cloudPush();
     }else{
       /* 이후엔 클라우드 기준 — 다른 기기의 삭제도 반영 */
       bookmarks=new Set(cloud);

@@ -30,6 +30,16 @@ node tools/add-data.mjs new-data.json             # 실제 추가 (index.html.ba
 - 헤더의 개수(패턴 N · 표현 N …)와 Day 범위도 자동 갱신.
 - 새 week/group/cat 값은 허용하되 경고로 알려줌(오타 방지).
 
+## 실황중계 탭 (06 · self-talk narration)
+
+아침 루틴 실황중계 — 행동하는 순간 현재진행형으로 중얼거리는 훈련 세트. 문장 탭 → 뜻·타이밍·용법·대안·축약 펼침 + 발음(TTS).
+
+- **데이터**: `const NARR={…};` 한 줄 (`daily_narration_morning.json` 원본 그대로, 스키마 무변경). `add-data.mjs`와 무관 — 갱신은 새 JSON으로 그 줄만 통째로 교체.
+- **배치 사유**: 핸드오프는 "데이터 디렉토리 배치"였으나 이 repo 컨벤션이 내장 DB(자기완결 단일 파일)라 인라인 임베드로 갈음.
+- `micro_points`에는 **P번호를 부여하지 않음** — P 체계는 Chat 세션에서 관리(충돌 방지).
+- 과거형(차 안 복기 모드)은 데이터에 `past` 필드가 추가된 뒤 구현 — 렌더 시 자동 변환 금지(waking→woke 등 불규칙).
+- 헤더의 "실황중계 N" 개수와 리드 문구(버전)는 NARR에서 동적 렌더 — 데이터만 갈아끼워도 stale 없음.
+
 ## 동기화 동작
 
 부팅 시 cloudPull, 즐겨찾기 토글 시 디바운스 cloudPush. 네트워크 실패 시 localStorage로 정상 동작.

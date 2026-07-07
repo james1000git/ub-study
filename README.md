@@ -37,6 +37,7 @@ node tools/add-data.mjs new-data.json             # 실제 추가 (index.html.ba
 - **데이터**: `const NARR={…};` 한 줄 (`daily_narration_morning.json` 기반). `add-data.mjs`와 무관 — 갱신은 새 JSON으로 그 줄만 통째로 교체.
 - **배치 사유**: 핸드오프는 "데이터 디렉토리 배치"였으나 이 repo 컨벤션이 내장 DB(자기완결 단일 파일)라 인라인 임베드로 갈음.
 - **v1.5 보강(2026-07-07)**: 전 50문장에 `past`(복기용 과거형, 시제 토글로 표시), 22문장에 `vars`(슬롯 변형), micro_points 10→18개. **기존 필드는 무변경, optional 필드만 추가** — 자동 시제 변환은 하지 않고 past도 데이터로 관리(불규칙 동사 안전). 보강본 사본: `Downloads/daily_narration_morning_v1.5.json` (Chat 세션 역전달용).
+- **v1.6 갱신(2026-07-07, Chat 세션 제작)**: 운전 3문장(차선변경×2, pull over)·도어락 1문장 추가, 점심(10문장)·정리·휴식(5문장) 구간 신설 — 50→69문장·11→13구간, micro_points 18→23개. 신규 문장 전원 `past` 포함.
 - `micro_points`에는 **P번호를 부여하지 않음** — P 체계는 Chat 세션에서 관리(충돌 방지).
 - 헤더의 "실황중계 N" 개수와 리드 문구(버전)는 NARR에서 동적 렌더 — 데이터만 갈아끼워도 stale 없음.
 

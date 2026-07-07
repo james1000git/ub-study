@@ -34,10 +34,10 @@ node tools/add-data.mjs new-data.json             # 실제 추가 (index.html.ba
 
 아침 루틴 실황중계 — 행동하는 순간 현재진행형으로 중얼거리는 훈련 세트. 문장 탭 → 뜻·타이밍·용법·대안·축약 펼침 + 발음(TTS).
 
-- **데이터**: `const NARR={…};` 한 줄 (`daily_narration_morning.json` 원본 그대로, 스키마 무변경). `add-data.mjs`와 무관 — 갱신은 새 JSON으로 그 줄만 통째로 교체.
+- **데이터**: `const NARR={…};` 한 줄 (`daily_narration_morning.json` 기반). `add-data.mjs`와 무관 — 갱신은 새 JSON으로 그 줄만 통째로 교체.
 - **배치 사유**: 핸드오프는 "데이터 디렉토리 배치"였으나 이 repo 컨벤션이 내장 DB(자기완결 단일 파일)라 인라인 임베드로 갈음.
+- **v1.5 보강(2026-07-07)**: 전 50문장에 `past`(복기용 과거형, 시제 토글로 표시), 22문장에 `vars`(슬롯 변형), micro_points 10→18개. **기존 필드는 무변경, optional 필드만 추가** — 자동 시제 변환은 하지 않고 past도 데이터로 관리(불규칙 동사 안전). 보강본 사본: `Downloads/daily_narration_morning_v1.5.json` (Chat 세션 역전달용).
 - `micro_points`에는 **P번호를 부여하지 않음** — P 체계는 Chat 세션에서 관리(충돌 방지).
-- 과거형(차 안 복기 모드)은 데이터에 `past` 필드가 추가된 뒤 구현 — 렌더 시 자동 변환 금지(waking→woke 등 불규칙).
 - 헤더의 "실황중계 N" 개수와 리드 문구(버전)는 NARR에서 동적 렌더 — 데이터만 갈아끼워도 stale 없음.
 
 ## 동기화 동작

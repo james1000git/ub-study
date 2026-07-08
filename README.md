@@ -30,14 +30,16 @@ node tools/add-data.mjs new-data.json             # 실제 추가 (index.html.ba
 - 헤더의 개수(패턴 N · 표현 N …)와 Day 범위도 자동 갱신.
 - 새 week/group/cat 값은 허용하되 경고로 알려줌(오타 방지).
 
-## 실황중계 탭 (06 · self-talk narration)
+## 실황중계 탭 (06 · Daily Narration · self-talk)
 
-아침 루틴 실황중계 — 행동하는 순간 현재진행형으로 중얼거리는 훈련 세트. 문장 탭 → 뜻·타이밍·용법·대안·축약 펼침 + 발음(TTS).
+하루 전체(기상~귀가) 실황중계 — 행동하는 순간 현재진행형으로 중얼거리는 훈련 세트. 문장 탭 → 뜻·타이밍·용법·대안·변형·축약 펼침 + 발음(TTS) + 시제 토글(실황↔복기 과거형).
 
-- **데이터**: `const NARR={…};` 한 줄 (`daily_narration_morning.json` 기반). `add-data.mjs`와 무관 — 갱신은 새 JSON으로 그 줄만 통째로 교체.
+- **데이터**: `const NARR={…};` 한 줄 (`daily_narration_v1_9.json` 그대로, 현재 v1.9 = 100문장·18구간). `add-data.mjs`와 무관 — 갱신은 새 JSON으로 그 줄만 통째로 교체.
+- **파일명 규칙(2026-07-07 리네이밍)**: `daily_narration_morning*` → `daily_narration*` — v1.9에서 스코프가 하루 전체로 확장되어 morning은 레거시(meta.scope_note 참조). repo에는 JSON 파일이 없고 인라인 임베드라 git mv 대상 없음. **UI 표시명도 meta.title(레거시 "아침 루틴")과 분리**해 "실황중계 · Daily Narration" 고정 표기.
 - **배치 사유**: 핸드오프는 "데이터 디렉토리 배치"였으나 이 repo 컨벤션이 내장 DB(자기완결 단일 파일)라 인라인 임베드로 갈음.
-- **v1.5 보강(2026-07-07)**: 전 50문장에 `past`(복기용 과거형, 시제 토글로 표시), 22문장에 `vars`(슬롯 변형), micro_points 10→18개. **기존 필드는 무변경, optional 필드만 추가** — 자동 시제 변환은 하지 않고 past도 데이터로 관리(불규칙 동사 안전). 보강본 사본: `Downloads/daily_narration_morning_v1.5.json` (Chat 세션 역전달용).
+- **v1.5 보강(2026-07-07)**: 전 50문장에 `past`(복기용 과거형, 시제 토글로 표시), 22문장에 `vars`(슬롯 변형), micro_points 10→18개. **기존 필드는 무변경, optional 필드만 추가** — 자동 시제 변환은 하지 않고 past도 데이터로 관리(불규칙 동사 안전).
 - **v1.6 갱신(2026-07-07, Chat 세션 제작)**: 운전 3문장(차선변경×2, pull over)·도어락 1문장 추가, 점심(10문장)·정리·휴식(5문장) 구간 신설 — 50→69문장·11→13구간, micro_points 18→23개. 신규 문장 전원 `past` 포함.
+- **v1.9 갱신(2026-07-07, Chat 세션 제작)**: v1.7·v1.8 포함 — 편의점 계산·세면·준비·흡연 보강, 퇴근·헬스장·샤워·귀가 5구간 신설. 69→100문장·13→18구간, micro_points 23→32개. 콩글리시 교정(treadmill·gym·locker 등).
 - `micro_points`에는 **P번호를 부여하지 않음** — P 체계는 Chat 세션에서 관리(충돌 방지).
 - 헤더의 "실황중계 N" 개수와 리드 문구(버전)는 NARR에서 동적 렌더 — 데이터만 갈아끼워도 stale 없음.
 

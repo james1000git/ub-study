@@ -86,6 +86,8 @@
   .stx .stno{font-family:"Times New Roman",serif;font-style:italic;font-weight:700;color:var(--green);font-size:13px;min-width:20px;text-align:right;}
   .stx .sten{font-size:14.5px;font-weight:600;letter-spacing:-.003em;}
   .stx[open]{border-left-color:var(--accent);}
+  .stx.stx-ref{border-left-style:dashed;}
+  .stref{margin-left:auto;font-size:9px;font-weight:700;color:var(--gold);white-space:nowrap;padding-left:8px;}
   .stbody{padding:1px 13px 12px 42px;}
   .strow{display:flex;gap:8px;font-size:12.5px;margin-top:5px;line-height:1.55;}
   .stlab{flex:0 0 46px;font-size:10px;font-weight:800;color:var(--gold);letter-spacing:.06em;text-transform:uppercase;padding-top:2px;}
@@ -960,28 +962,48 @@ function stChips(){
   $('st-chips').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{stFilter=b.dataset.f;stChips();stRender();});
 }
 function stRow(label,txt){return `<div class="strow"><span class="stlab">${label}</span><span>${txt}</span></div>`;}
+function stMatch(it,q){
+  return !q||norm(it.en).includes(q)||norm(it.ko).includes(q)||norm(it.note).includes(q)||norm(it.alt).includes(q)||norm((it.vars||[]).join(' ')).includes(q)||norm(it.past).includes(q);
+}
+/* 운전 문장 재수록(뷰 전용) — 퇴근·귀가 때 출발·운전 구간을 오가지 않게 해당 구간에 같은 문장을 다시 표시.
+   데이터 무변경. en 문자열로 참조(no는 버전마다 밀려서 키로 부적합). 원본 구간명을 ↻ 배지로 표시 */
+const ST_REFS={
+  '퇴근·이동':{after:"I'm heading to the gym.",ens:[
+    "I'm heading down to the parking garage.","I'm opening the car door.","I'm getting in the car.",
+    "I'm starting the car.","I'm pulling out of the parking garage.",
+    "I'm moving over to the second lane.","I'm moving over to the fast lane.","I'm pulling over for a minute."]},
+  '귀가':{after:"I'm going through the gate.",ens:[
+    "I'm driving down to the parking garage.","There are no spots.","I'm going down to B2.",
+    "I'm parking.","I'm getting out of the car."]}
+};
 function stRender(){
   const q=stQuery;
   let items=[];
   if(stFilter!=='__pts__'){
     items=ST_ITEMS.filter(it=>{
       if(stFilter!=='all'&&it.section!==stFilter)return false;
-      if(q&&!(norm(it.en).includes(q)||norm(it.ko).includes(q)||norm(it.note).includes(q)||norm(it.alt).includes(q)||norm((it.vars||[]).join(' ')).includes(q)||norm(it.past).includes(q)))return false;
-      return true;
+      return stMatch(it,q);
     });
   }
   const showPts=(stFilter==='all'||stFilter==='__pts__');
   const pts=showPts?NARR.micro_points.filter(p=>!q||norm(p.topic).includes(q)||norm(p.rule).includes(q)):[];
-  $('st-count').textContent=`${items.length}문장${pts.length?` · 포인트 ${pts.length}개`:''}${stTense==='past'?' · 복기(과거형) 모드':''}`;
-  let h='';
+  let h='',nRef=0;
   NARR.sections.forEach(s=>{
-    const group=items.filter(it=>it.section===s.section);
+    const group=items.filter(it=>it.section===s.section).map(it=>({it}));
+    const rc=ST_REFS[s.section];
+    if(rc&&stFilter!=='__pts__'&&(stFilter==='all'||stFilter===s.section)){
+      const refs=rc.ens.map(en=>ST_ITEMS.find(x=>x.en===en)).filter(Boolean)
+        .filter(it=>stMatch(it,q)).map(it=>({it,ref:it.section}));
+      nRef+=refs.length;
+      const pos=group.findIndex(e=>e.it.en===rc.after);
+      if(pos>=0)group.splice(pos+1,0,...refs); else group.push(...refs);
+    }
     if(!group.length)return;
     h+=`<div class="st-sec">${s.section}</div><div class="st-items">`;
-    h+=group.map(it=>{
+    h+=group.map(({it,ref})=>{
       const disp=(stTense==='past'&&it.past)?it.past:it.en;
-      return `<details class="stx">
-        <summary><span class="stno">${it.no}</span><span class="sten">${esc(disp)}</span></summary>
+      return `<details class="stx${ref?' stx-ref':''}">
+        <summary><span class="stno">${it.no}</span><span class="sten">${esc(disp)}</span>${ref?`<span class="stref">↻ ${esc(ref)}</span>`:''}</summary>
         <div class="stbody">
           ${stTense==='past'?stRow('실황',esc(it.en)):''}
           ${stRow('뜻',esc(it.ko))}
@@ -995,6 +1017,7 @@ function stRender(){
       </details>`;}).join('');
     h+='</div>';
   });
+  $('st-count').textContent=`${items.length}문장${nRef?` (+재수록 ${nRef})`:''}${pts.length?` · 포인트 ${pts.length}개`:''}${stTense==='past'?' · 복기(과거형) 모드':''}`;
   if(pts.length){
     h+=`<div class="st-sec">💡 핵심 포인트 — 용법 규칙</div><div class="st-items">`;
     h+=pts.map(p=>

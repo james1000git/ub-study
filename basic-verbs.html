@@ -1251,7 +1251,7 @@ const framesFor=()=>{
 
 function buildDeck(){
   let fs;
-  if(mode==="drill"&&drillId!=="all")fs=[F.find(f=>f.id===drillId)];
+  if((mode==="drill"||mode==="cloze")&&drillId!=="all")fs=[F.find(f=>f.id===drillId)];
   else fs=framesFor();
   deck=[];
   for(const f of fs){
@@ -1354,7 +1354,7 @@ function renderFoot(){
 function setMode(m2){
   mode=m2;
   for(const t of["mix","drill","cloze","miss"])document.getElementById("tab"+t).classList.toggle("on",t===m2);
-  document.getElementById("selframe").style.display=m2==="drill"?"":"none";
+  document.getElementById("selframe").style.display=(m2==="drill"||m2==="cloze")?"":"none";
   if(m2==="miss")render();else buildDeck();
 }
 document.getElementById("tabmix").onclick=()=>setMode("mix");

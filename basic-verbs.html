@@ -52,6 +52,7 @@ nav button:focus-visible,button:focus-visible,select:focus-visible{outline:2px s
 .banned span::before{content:"✕ ";font-weight:700}
 .tap{font-size:12px;color:var(--sub);margin-top:auto}
 .ans{font-family:var(--mono);font-size:20px;line-height:1.45;font-weight:600;overflow-wrap:break-word}
+.cloze{font-family:var(--mono);font-size:18px;line-height:1.55;font-weight:600;letter-spacing:.4px;overflow-wrap:break-word}
 .amt{font-size:12.5px;color:var(--sub)}
 .amt b{color:var(--ink);font-weight:600}
 .note{font-size:12.5px;color:var(--acc);background:var(--accbg);border-radius:8px;padding:7px 10px}
@@ -77,6 +78,7 @@ nav button:focus-visible,button:focus-visible,select:focus-visible{outline:2px s
     <nav>
       <button id="tabmix" class="on">믹스</button>
       <button id="tabdrill">드릴</button>
+      <button id="tabcloze">빈칸</button>
       <button id="tabmiss">오답</button>
     </nav>
   </header>
@@ -461,6 +463,32 @@ const CNT=v=>F.filter(f=>f.verb===v).reduce((s,f)=>s+f.pool.length,0);
 const LOOKUP={};
 for(const f of F){let k=0;for(const seg of (SECS[f.id]||[["",f.pool.length]])){for(let i=0;i<seg[1];i++){const it=f.pool[k++];LOOKUP[it[0]]={f,ko:it[1],sec:seg[0]};}}}
 
+const CLOZE_OV={"I could go for some Korean food.":"_ _____ __ for some Korean food."};
+function cloze(s){
+  if(CLOZE_OV[s])return CLOZE_OV[s];
+  const toks=s.split(" ");
+  const norm=w=>w.replace(/[^A-Za-z']/g,"").toLowerCase();
+  const VERB=new Set(["have","has","had","having","got","get","gets","getting"]);
+  const AUX=new Set(["do","does","did","don't","doesn't","didn't","will","would","could","couldn't","should","can","may","must","is","are","was","were","am"]);
+  const ADV=new Set(["always","usually","just","still","often","never","all"]);
+  const CONTR=new Set(["i'm","it's","he's","she's","we're","they're","you're","i'll","we'll","he'll","she'll","let's","i've","we've"]);
+  const PRON=new Set(["i","we","you","he","she","it","they"]);
+  const BOUND=new Set(["to","for","of","and","but","or","that","if","because","when","while","after","before","since","like","where","how","why","who","maybe","sorry","thanks","think","feel","heard","know","guess","hope","said","say","let"]);
+  let v=-1;
+  for(let i=0;i<toks.length;i++){if(VERB.has(norm(toks[i]))){v=i;break;}}
+  if(v<0)return null;
+  let s0=v,subj=false;
+  while(s0>0){
+    const p=norm(toks[s0-1]);
+    if(!subj&&(AUX.has(p)||ADV.has(p))){s0--;continue;}
+    if(!subj&&(PRON.has(p)||CONTR.has(p))){s0--;subj=true;continue;}
+    if(subj){if(AUX.has(p)){s0--;continue;}break;}
+    if(BOUND.has(p)||/[.!?]$/.test(toks[s0-1]))break;
+    s0--;
+  }
+  return toks.map((t,i)=>i>=s0&&i<=v?t.replace(/[^.,!?;:—…()]/g,"_"):t).join(" ");
+}
+
 let mode="mix", drillId="all";
 let deck=[], idx=0;
 let sOK=0, sNG=0;
@@ -484,7 +512,7 @@ function buildDeck(){
       for(let i=0;i<seg[1];i++){const it=f.pool[k++];deck.push({f,a:it[0],ko:it[1],sec:seg[0],rev:false});}
     }
   }
-  if(mode==="mix"){
+  if(mode==="mix"||mode==="cloze"){
     for(let i=deck.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));const t=deck[i];deck[i]=deck[j];deck[j]=t;}
   }
   idx=0;render();
@@ -522,7 +550,7 @@ function startReplay(){
             :{f:{day:x.d,verb:"",sense:x.s,pattern:"",hint:x.s,banned:[],pool:[]},a:x.a,ko:x.ko||"",sec:"",rev:false};
   });
   mode="replay";
-  for(const t of["mix","drill","miss"])document.getElementById("tab"+t).classList.toggle("on",t==="miss");
+  for(const t of["mix","drill","cloze","miss"])document.getElementById("tab"+t).classList.toggle("on",t==="miss");
   document.getElementById("selframe").style.display="none";
   idx=0;render();
 }
@@ -537,7 +565,10 @@ function render(){
   if(mode==="drill")top+='<span class="fmeta">D'+f.day+" · "+esc(f.sense)+" ("+f.pool.length+"장)</span>";
   let body;
   if(!revealed){
-    body='<div class="meta">'+top+'</div><div class="ko">'+esc(c.ko)+'</div><div class="banned">'+ban+'</div>'+
+    const cz=mode==="cloze"?cloze(c.a):null;
+    body='<div class="meta">'+top+'</div><div class="ko">'+esc(c.ko)+'</div>'+
+    (cz?'<div class="cloze">'+esc(cz)+"</div>":"")+
+    '<div class="banned">'+ban+'</div>'+
     '<div class="tap">소리 내서 말한 뒤 — 카드를 탭하면 정답, 다시 탭하면 문제</div>';
   }else{
     body='<div class="meta">'+top+'</div><div class="ans">'+esc(c.a)+'</div><div class="kosub">'+esc(c.ko)+'</div>'+
@@ -548,7 +579,7 @@ function render(){
   }
   m.innerHTML='<div class="navrow"><button class="navbtn" id="bprev"'+(idx===0&&mode!=="replay"?" disabled":"")+'>← 이전</button>'+
   '<span class="navpos">'+(idx+1)+" / "+deck.length+'</span>'+
-  '<button class="navbtn" id="bnext">'+(idx===deck.length-1?(mode==="mix"?"새로 섞기 ↻":mode==="replay"?"다음 →":"처음부터 ↺"):"다음 →")+'</button></div>'+
+  '<button class="navbtn" id="bnext">'+(idx===deck.length-1?(mode==="mix"||mode==="cloze"?"새로 섞기 ↻":mode==="replay"?"다음 →":"처음부터 ↺"):"다음 →")+'</button></div>'+
   '<div class="card"><div class="cbody" id="cb">'+body+'</div></div>';
   document.getElementById("cb").onclick=()=>toggleReveal();
   if(revealed){
@@ -574,12 +605,13 @@ function renderFoot(){
 
 function setMode(m2){
   mode=m2;
-  for(const t of["mix","drill","miss"])document.getElementById("tab"+t).classList.toggle("on",t===m2);
+  for(const t of["mix","drill","cloze","miss"])document.getElementById("tab"+t).classList.toggle("on",t===m2);
   document.getElementById("selframe").style.display=m2==="drill"?"":"none";
   if(m2==="miss")render();else buildDeck();
 }
 document.getElementById("tabmix").onclick=()=>setMode("mix");
 document.getElementById("tabdrill").onclick=()=>setMode("drill");
+document.getElementById("tabcloze").onclick=()=>setMode("cloze");
 document.getElementById("tabmiss").onclick=()=>setMode("miss");
 
 const sf=document.getElementById("selframe");

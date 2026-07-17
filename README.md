@@ -5,6 +5,7 @@
 ## 구성
 
 - `index.html` — 전체 앱(자기완결, 인라인 CSS/JS + 내장 DB). 빌드 불필요.
+- `basic-verbs.html` — 기본동사100 프레임 드릴(현재 Day 1–15). 옵시디언 노트(기본동사_D0xx*.md) 원문 한↔영 294쌍, 믹스(랜덤)·드릴(수록 순서)·오답 재학습. 07 탭에서 iframe으로 임베드되며 /basic-verbs.html 단독 접근도 가능. 카드 데이터는 파일 내 F 배열(수동 갱신).
 - `api/sync.mjs` — 즐겨찾기 기기 간 동기화용 중계 함수. 같은 도메인이라 CORS 불필요.
   - 저장소: Upstash Redis(Vercel 마켓플레이스 연동, 무료 티어). 인증·암호화 없음(개인 학습 즐겨찾기 id만 저장).
   - 환경변수 `KV_REST_API_URL`/`KV_REST_API_TOKEN`(또는 `UPSTASH_REDIS_REST_*`)이 없으면 구 jsonblob으로 폴백.

@@ -34,8 +34,11 @@ nav{display:flex;gap:4px}
 nav button{font:inherit;font-size:13px;padding:5px 12px;border:1px solid transparent;border-radius:999px;background:none;color:var(--sub);cursor:pointer}
 nav button.on{background:var(--card);border-color:var(--line);color:var(--ink);font-weight:600}
 nav button:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-.opts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.opts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
 .opts select{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);max-width:100%}
+.vchips{display:flex;gap:6px;flex-wrap:wrap}
+.vchips button{font:inherit;font-size:12.5px;padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--sub);cursor:pointer}
+.vchips button.on{background:var(--accbg);border-color:var(--acc);color:var(--acc);font-weight:600}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
 .navrow{display:flex;gap:10px;margin:0 0 10px;align-items:center}
 .navbtn{font:inherit;font-size:13.5px;padding:9px 0;flex:1;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);cursor:pointer}
@@ -83,7 +86,7 @@ nav button:focus-visible,button:focus-visible,select:focus-visible{outline:2px s
     </nav>
   </header>
   <div class="opts" id="opts">
-    <select id="selverb"><option value="all">전체 동사</option><option value="have">have</option><option value="get">get</option></select>
+    <div class="vchips" id="selverb"></div>
     <select id="selframe" style="display:none"></select>
   </div>
   <div id="syncstatus" style="font-size:11px;text-align:center;margin:2px 0 4px;min-height:14px;color:#999;"></div>
@@ -1297,10 +1300,9 @@ function cloudPush(){
   },600);
 }
 
-const framesFor=()=>{
-  const v=document.getElementById("selverb").value;
-  return F.filter(f=>v==="all"||f.verb===v);
-};
+/* 동사 필터 — 복수 선택(토글 칩). 빈 Set = 전체 */
+const selVerbs=new Set();
+const framesFor=()=>F.filter(f=>!selVerbs.size||selVerbs.has(f.verb));
 
 function buildDeck(){
   let fs;
@@ -1418,9 +1420,25 @@ document.getElementById("tabmiss").onclick=()=>setMode("miss");
 const sf=document.getElementById("selframe");
 sf.innerHTML='<option value="all">전체 프레임 ('+TOTAL+'장)</option>'+F.map(f=>'<option value="'+f.id+'">D'+f.day+" — "+esc(f.sense)+" ("+f.pool.length+"장)</option>").join("");
 sf.onchange=()=>{drillId=sf.value;buildDeck();};
-const sv=document.getElementById("selverb");
-sv.innerHTML='<option value="all">전체 동사 ('+TOTAL+'장)</option>'+["have","get","make","take","do"].map(v=>'<option value="'+v+'">'+v+" ("+CNT(v)+"장)</option>").join("");
-sv.onchange=()=>{if(mode!=="miss")buildDeck();};
+const VERBS=["have","get","make","take","do"];
+function renderVerbChips(){
+  const el=document.getElementById("selverb");
+  const selN=framesFor().reduce((s,f)=>s+f.pool.length,0);
+  el.innerHTML='<button class="'+(selVerbs.size?'':'on')+'" data-v="all">전체'+(selVerbs.size?'':' ('+TOTAL+'장)')+'</button>'+
+    VERBS.map(v=>'<button class="'+(selVerbs.has(v)?'on':'')+'" data-v="'+v+'">'+v+" ("+CNT(v)+"장)</button>").join("")+
+    (selVerbs.size?'<span class="fmeta">'+selN+'장</span>':"");
+  for(const b of el.querySelectorAll("button"))b.onclick=()=>{
+    const v=b.dataset.v;
+    if(v==="all")selVerbs.clear();
+    else{
+      if(selVerbs.has(v))selVerbs.delete(v);else selVerbs.add(v);
+      if(selVerbs.size===VERBS.length)selVerbs.clear(); /* 전부 고르면 = 전체 */
+    }
+    renderVerbChips();
+    if(mode!=="miss")buildDeck();
+  };
+}
+renderVerbChips();
 
 document.addEventListener("keydown",e=>{
   if(mode==="miss")return;

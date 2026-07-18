@@ -90,7 +90,7 @@ nav button:focus-visible,button:focus-visible,select:focus-visible{outline:2px s
   </header>
   <div class="opts" id="opts">
     <div class="vchips" id="selverb"></div>
-    <select id="selframe" style="display:none"></select>
+    <select id="selframe"></select>
     <button class="tog" id="hinttoggle" onclick="toggleHint()">💡 힌트 켬</button>
   </div>
   <div id="syncstatus" style="font-size:11px;text-align:center;margin:2px 0 4px;min-height:14px;color:#999;"></div>
@@ -1310,7 +1310,7 @@ const framesFor=()=>F.filter(f=>!selVerbs.size||selVerbs.has(f.verb));
 
 function buildDeck(){
   let fs;
-  if((mode==="drill"||mode==="cloze")&&drillId!=="all")fs=[F.find(f=>f.id===drillId)];
+  if(drillId!=="all")fs=[F.find(f=>f.id===drillId)]; /* 믹스·드릴·빈칸 공통 — 프레임 선택이 동사 필터보다 우선 */
   else fs=framesFor();
   deck=[];
   for(const f of fs){
@@ -1431,7 +1431,7 @@ function renderFoot(){
 function setMode(m2){
   mode=m2;
   for(const t of["mix","drill","cloze","miss"])document.getElementById("tab"+t).classList.toggle("on",t===m2);
-  document.getElementById("selframe").style.display=(m2==="drill"||m2==="cloze")?"":"none";
+  document.getElementById("selframe").style.display=(m2==="mix"||m2==="drill"||m2==="cloze")?"":"none";
   if(m2==="miss")render();else buildDeck();
 }
 document.getElementById("tabmix").onclick=()=>setMode("mix");

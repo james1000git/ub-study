@@ -43,6 +43,7 @@ nav button:focus-visible,button:focus-visible,select:focus-visible{outline:2px s
 .navrow{display:flex;gap:10px;margin:0 0 10px;align-items:center}
 .navbtn{font:inherit;font-size:13.5px;padding:9px 0;flex:1;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);cursor:pointer}
 .navbtn[disabled]{opacity:.4;cursor:default}
+.navbtn.first{flex:0 0 auto;padding:9px 14px}
 .navpos{font-size:12px;color:var(--sub);min-width:64px;text-align:center;font-variant-numeric:tabular-nums}
 .cbody{padding:22px 20px 20px;min-height:240px;display:flex;flex-direction:column;gap:16px}
 .meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -1328,6 +1329,7 @@ function nextCard(){
   if(mode==="replay"){if(deck.length>1){idx=(idx+1)%deck.length;render();}else render();return;}
   if(idx<deck.length-1){idx++;render();}else buildDeck();
 }
+function firstCard(){if(idx!==0){idx=0;render();}}
 function toggleReveal(){deck[idx].rev=!deck[idx].rev;render();}
 function grade(ok){
   const c=deck[idx];
@@ -1380,11 +1382,13 @@ function render(){
     '<div class="banned">'+ban+'</div>'+
     '<div class="grade"><button class="gok" id="bok">나왔다 <span class="kbd">1</span></button><button class="gng" id="bng">막혔다 <span class="kbd">2</span></button></div>';
   }
-  m.innerHTML='<div class="navrow"><button class="navbtn" id="bprev"'+(idx===0&&mode!=="replay"?" disabled":"")+'>← 이전</button>'+
+  m.innerHTML='<div class="navrow"><button class="navbtn first" id="bfirst"'+(idx===0?" disabled":"")+' title="처음으로">⏮</button>'+
+  '<button class="navbtn" id="bprev"'+(idx===0&&mode!=="replay"?" disabled":"")+'>← 이전</button>'+
   '<span class="navpos">'+(idx+1)+" / "+deck.length+'</span>'+
   '<button class="navbtn" id="bnext">'+(idx===deck.length-1?(mode==="mix"||mode==="cloze"?"새로 섞기 ↻":mode==="replay"?"다음 →":"처음부터 ↺"):"다음 →")+'</button></div>'+
   '<div class="card"><div class="cbody" id="cb">'+body+'</div></div>';
   document.getElementById("cb").onclick=()=>toggleReveal();
+  document.getElementById("bfirst").onclick=()=>firstCard();
   if(revealed){
     document.getElementById("bok").onclick=e=>{e.stopPropagation();grade(true)};
     document.getElementById("bng").onclick=e=>{e.stopPropagation();grade(false)};
@@ -1445,6 +1449,7 @@ document.addEventListener("keydown",e=>{
   if(e.key===" "||e.key==="Enter"){e.preventDefault();deck[idx].rev?nextCard():toggleReveal();}
   else if(e.key==="ArrowLeft")prevCard();
   else if(e.key==="ArrowRight")nextCard();
+  else if(e.key==="Home"){e.preventDefault();firstCard();}
   else if(e.key==="1"&&deck[idx].rev)grade(true);
   else if(e.key==="2"&&deck[idx].rev)grade(false);
 });

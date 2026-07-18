@@ -86,6 +86,7 @@ nav button:focus-visible,button:focus-visible,select:focus-visible{outline:2px s
     <select id="selverb"><option value="all">전체 동사</option><option value="have">have</option><option value="get">get</option></select>
     <select id="selframe" style="display:none"></select>
   </div>
+  <div id="syncstatus" style="font-size:11px;text-align:center;margin:2px 0 4px;min-height:14px;color:#999;"></div>
   <div id="main"></div>
   <div class="stats" id="foot"></div>
 </div>
@@ -1242,7 +1243,59 @@ let deck=[], idx=0;
 let sOK=0, sNG=0;
 let missed=[];
 try{missed=JSON.parse(localStorage.getItem("ub-missed")||"[]")}catch(e){}
-const saveMissed=()=>{try{localStorage.setItem("ub-missed",JSON.stringify(missed.slice(0,100)))}catch(e){}};
+const saveMissedLocal=()=>{try{localStorage.setItem("ub-missed",JSON.stringify(missed.slice(0,100)))}catch(e){}};
+const saveMissed=()=>{saveMissedLocal();cloudPush();};
+
+/* ---------- 클라우드 동기화 — 05 플래시카드와 같은 /api/sync 블롭의 bv 필드 사용 ----------
+   오답은 영어 문장 문자열만 올리고, 받을 땐 LOOKUP으로 카드 정보 복원. 실패해도 localStorage로 정상 동작. */
+const SYNC_URL="/api/sync";
+const SYNCED_KEY="ub_bv_synced"; /* 이 기기가 최초 합집합 동기화를 마쳤는지 */
+let _syncTimer=null;
+function setSyncStatus(txt,color){const el=document.getElementById("syncstatus");if(el){el.textContent=txt;el.style.color=color||"#999";}}
+const bvFromCloud=a=>{const L=LOOKUP[a];return L?{a:a,ko:L.ko,s:L.f.sense,d:L.f.day}:null;}; /* 데이터 개편으로 사라진 문장은 버림 */
+async function cloudPull(){
+  setSyncStatus("☁ 동기화 확인 중…","#999");
+  try{
+    const r=await fetch(SYNC_URL,{cache:"no-store"});
+    if(!r.ok)throw 0;
+    const j=await r.json();
+    const cBv=(j&&Array.isArray(j.bv))?j.bv:[];
+    /* 블롭에 다른 학습 데이터가 살아 있으면 빈 bv는 다른 기기의 '비우기'로 신뢰,
+       전부 비어 있으면 저장소 유실로 보고 로컬을 지우는 대신 올린다 */
+    const blobAlive=!!(j&&((Array.isArray(j.ids)&&j.ids.length)||(Array.isArray(j.wrongs)&&j.wrongs.length)||(j.srs&&typeof j.srs==="object"&&Object.keys(j.srs).length)));
+    if(!localStorage.getItem(SYNCED_KEY)){
+      /* 최초 연결: 기존 로컬 오답을 잃지 않게 클라우드와 합침 */
+      const had=missed.length;
+      for(const a of cBv){if(!missed.some(x=>x.a===a)){const it=bvFromCloud(a);if(it)missed.push(it);}}
+      saveMissedLocal();
+      try{localStorage.setItem(SYNCED_KEY,"1")}catch(e){}
+      if(had>0)cloudPush();
+    }else if(!cBv.length&&missed.length&&!blobAlive){
+      cloudPush();
+    }else{
+      /* 이후엔 클라우드 기준 — 다른 기기의 채점·비우기도 반영 */
+      missed=cBv.map(bvFromCloud).filter(Boolean);
+      saveMissedLocal();
+    }
+    if(mode==="miss")render();
+    setSyncStatus("☁ 동기화됨 · ✗"+missed.length,"#2a8a5a");
+  }catch(e){
+    setSyncStatus("⚠ 오프라인 — 이 기기에만 저장됨","#b8702a");
+  }
+}
+function cloudPush(){
+  if(_syncTimer)clearTimeout(_syncTimer);
+  setSyncStatus("☁ 동기화 중…","#999");
+  _syncTimer=setTimeout(async()=>{
+    try{
+      const r=await fetch(SYNC_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({bv:missed.slice(0,100).map(x=>x.a)})});
+      if(!r.ok)throw 0;
+      setSyncStatus("☁ 동기화됨 · ✗"+missed.length,"#2a8a5a");
+    }catch(e){
+      setSyncStatus("⚠ 저장 대기 — 오프라인","#b8702a");
+    }
+  },600);
+}
 
 const framesFor=()=>{
   const v=document.getElementById("selverb").value;
@@ -1378,6 +1431,7 @@ document.addEventListener("keydown",e=>{
   else if(e.key==="2"&&deck[idx].rev)grade(false);
 });
 buildDeck();
+cloudPull();
 </script>
 
 </body>

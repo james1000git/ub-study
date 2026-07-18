@@ -39,6 +39,8 @@ nav button:focus-visible,button:focus-visible,select:focus-visible{outline:2px s
 .vchips{display:flex;gap:6px;flex-wrap:wrap}
 .vchips button{font:inherit;font-size:12.5px;padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--sub);cursor:pointer}
 .vchips button.on{background:var(--accbg);border-color:var(--acc);color:var(--acc);font-weight:600}
+.tog{font:inherit;font-size:12.5px;padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--sub);cursor:pointer}
+.tog.on{background:var(--accbg);border-color:var(--acc);color:var(--acc);font-weight:600}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
 .navrow{display:flex;gap:10px;margin:0 0 10px;align-items:center}
 .navbtn{font:inherit;font-size:13.5px;padding:9px 0;flex:1;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);cursor:pointer}
@@ -89,6 +91,7 @@ nav button:focus-visible,button:focus-visible,select:focus-visible{outline:2px s
   <div class="opts" id="opts">
     <div class="vchips" id="selverb"></div>
     <select id="selframe" style="display:none"></select>
+    <button class="tog" id="hinttoggle" onclick="toggleHint()">💡 힌트 켬</button>
   </div>
   <div id="syncstatus" style="font-size:11px;text-align:center;margin:2px 0 4px;min-height:14px;color:#999;"></div>
   <div id="main"></div>
@@ -1329,6 +1332,20 @@ function nextCard(){
   if(mode==="replay"){if(deck.length>1){idx=(idx+1)%deck.length;render();}else render();return;}
   if(idx<deck.length-1){idx++;render();}else buildDeck();
 }
+/* 힌트 태그(문제 면의 뜻 분류 pill) 켜기/끄기 — 기기별 기억 */
+let showHint=true;
+try{const v=localStorage.getItem("ub-hint");if(v!==null)showHint=(v==="1")}catch(e){}
+function toggleHint(){
+  showHint=!showHint;
+  try{localStorage.setItem("ub-hint",showHint?"1":"0")}catch(e){}
+  updateHintBtn();
+  if(mode!=="miss")render();
+}
+function updateHintBtn(){
+  const b=document.getElementById("hinttoggle");
+  b.textContent=showHint?"💡 힌트 켬":"💡 힌트 끔";
+  b.classList.toggle("on",showHint);
+}
 function firstCard(){if(idx!==0){idx=0;render();}}
 function toggleReveal(){deck[idx].rev=!deck[idx].rev;render();}
 function grade(ok){
@@ -1366,7 +1383,8 @@ function render(){
   const c=deck[idx],f=c.f,revealed=c.rev;
   const ban=f.banned.map(b=>"<span>"+esc(b)+"</span>").join("");
   let top=(mode==="replay"?'<span class="pill" style="background:var(--badbg);color:var(--bad)">오답 재학습</span>':"")+
-  '<span class="pill">'+esc(f.hint)+"</span>"+(c.sec?'<span class="fmeta">'+esc(c.sec)+"</span>":"");
+  ((revealed||showHint)?'<span class="pill">'+esc(f.hint)+"</span>":"")+ /* 정답 면에선 항상 표시 */
+  (c.sec?'<span class="fmeta">'+esc(c.sec)+"</span>":"");
   if(mode==="drill")top+='<span class="fmeta">D'+f.day+" · "+esc(f.sense)+" ("+f.pool.length+"장)</span>";
   let body;
   if(!revealed){
@@ -1453,6 +1471,7 @@ document.addEventListener("keydown",e=>{
   else if(e.key==="1"&&deck[idx].rev)grade(true);
   else if(e.key==="2"&&deck[idx].rev)grade(false);
 });
+updateHintBtn();
 buildDeck();
 cloudPull();
 </script>

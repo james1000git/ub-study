@@ -1364,13 +1364,14 @@ function grade(ok){
   else{sNG++;if(!missed.some(x=>x.a===c.a))missed.unshift({a:c.a,ko:c.ko,s:c.f.sense,d:c.f.day});saveMissed();}
   nextCard();
 }
-function startReplay(){
+function startReplay(shuf){
   if(!missed.length)return;
   deck=missed.map(x=>{
     const L=LOOKUP[x.a];
     return L?{f:L.f,a:x.a,ko:L.ko,sec:L.sec,rev:false}
             :{f:{day:x.d,verb:"",sense:x.s,pattern:"",hint:x.s,banned:[],pool:[]},a:x.a,ko:x.ko||"",sec:"",rev:false};
   });
+  if(shuf){for(let i=deck.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));const t=deck[i];deck[i]=deck[j];deck[j]=t;}}
   mode="replay";
   for(const t of["mix","drill","cloze","miss"])document.getElementById("tab"+t).classList.toggle("on",t==="miss");
   document.getElementById("selframe").style.display="none";
@@ -1418,8 +1419,9 @@ function render(){
 function renderMiss(m){
   if(!missed.length){m.innerHTML='<div class="empty">막힌 카드가 없습니다.</div>';return;}
   const items=missed.map(x=>'<div class="mitem"><div class="ans">'+esc(x.a)+'</div><div class="kosub">'+esc(x.ko||"")+'</div><div class="amt">D'+x.d+" · "+esc(x.s)+"</div></div>").join("");
-  m.innerHTML='<div class="mtop"><span class="fmeta">막힌 카드 '+missed.length+'개 (최근순)</span><span><button id="mreplay">다시 풀기</button> <button id="mclear">비우기</button></span></div><div class="mlist">'+items+"</div>";
+  m.innerHTML='<div class="mtop"><span class="fmeta">막힌 카드 '+missed.length+'개 (최근순)</span><span><button id="mreplay">다시 풀기</button> <button id="mshuffle">🔀 랜덤 풀기</button> <button id="mclear">비우기</button></span></div><div class="mlist">'+items+"</div>";
   document.getElementById("mreplay").onclick=()=>startReplay();
+  document.getElementById("mshuffle").onclick=()=>startReplay(true);
   document.getElementById("mclear").onclick=()=>{missed=[];saveMissed();renderMiss(document.getElementById("main"))};
 }
 function renderFoot(){
